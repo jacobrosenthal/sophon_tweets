@@ -1,6 +1,7 @@
 //! `cargo run consumer_key consumer_secret_key access_token secret_access_token`
 
-use std::collections::HashMap;
+use reqwest::multipart;
+use reqwest_oauth1::OAuthClientProvider;
 use std::time::Duration;
 use tokio::time::delay_for;
 use web3::contract::{Contract, Options};
@@ -49,7 +50,7 @@ async fn radius(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         world_radius
     );
 
-    send(&tweet)?;
+    send(tweet).await?;
 
     Ok(())
 }
@@ -65,7 +66,7 @@ async fn players(contract: Contract<web3::transports::Http>) -> Result<(), Sopho
         n_players
     );
 
-    send(&tweet)?;
+    send(tweet).await?;
 
     Ok(())
 }
@@ -80,53 +81,36 @@ async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7]
     );
 
-    send(&tweet)?;
+    send(tweet).await?;
 
     Ok(())
 }
 
-fn send(content: &str) -> Result<(), SophonError> {
+async fn send(tweet: String) -> Result<(), SophonError> {
     let args: Vec<String> = std::env::args().collect();
     let consumer_key = args[1].clone();
     let consumer_secret_key = args[2].clone();
     let access_token = args[3].clone();
     let secret_access_token = args[4].clone();
 
-    let mut request = url::Url::parse("https://api.twitter.com/1.1/statuses/update.json")?;
+    let secrets = reqwest_oauth1::Secrets::new(consumer_key, consumer_secret_key)
+        .token(access_token, secret_access_token);
 
-    let params: Option<HashMap<&str, &str>> = Some(HashMap::new());
-    {
-        let mut query_pairs = request.query_pairs_mut();
-        query_pairs.append_pair("status", content);
-        if let Some(pairs) = params {
-            for (key, value) in pairs.iter() {
-                query_pairs.append_pair(key, value);
-            }
-        }
-    }
+    let endpoint = "https://api.twitter.com/1.1/statuses/update.json";
 
-    let url = url::Url::parse(&request.to_string().replace("+", "%20"))?;
+    let content = multipart::Form::new().text("status", tweet);
 
-    let method = "POST";
-
-    let header = oauthcli::OAuthAuthorizationHeaderBuilder::new(
-        method,
-        &url,
-        consumer_key,
-        consumer_secret_key,
-        oauthcli::SignatureMethod::HmacSha1,
-    )
-    .token(access_token, secret_access_token)
-    .finish_for_twitter();
-
-    let mut response = reqwest::Client::new()
-        .post(&url.to_string())
-        .header("Authorization", header.to_string())
-        .send()?;
+    let response = reqwest::Client::new()
+        // enable OAuth1 request
+        .oauth1(secrets)
+        .post(endpoint)
+        .multipart(content)
+        .send()
+        .await?;
 
     //todo, TwitterApiError here. but duplicate tweets, like if no planet totals have changed, will error, so just print
     if response.status() != 200 {
-        dbg!(response.text().unwrap());
+        dbg!(response.text().await.unwrap());
     }
     Ok(())
 }
@@ -139,6 +123,7 @@ enum SophonError {
     ContractResponseParse,
     TwitterUrl,
     HttpError,
+    OAuth,
 }
 
 impl From<std::io::Error> for SophonError {
@@ -179,5 +164,11 @@ impl From<url::ParseError> for SophonError {
 impl From<reqwest::Error> for SophonError {
     fn from(_err: reqwest::Error) -> Self {
         SophonError::HttpError
+    }
+}
+
+impl From<reqwest_oauth1::Error> for SophonError {
+    fn from(_err: reqwest_oauth1::Error) -> Self {
+        SophonError::OAuth
     }
 }
