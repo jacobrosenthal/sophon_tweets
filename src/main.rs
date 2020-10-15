@@ -14,7 +14,7 @@ const STAGGER_DELAY: Duration = Duration::from_secs(60 * 60 * 8);
 async fn main() {
     let ctrl_c = tokio::signal::ctrl_c().map_err(SophonError::from);
 
-    let _ = futures_micro::or!(ctrl_c, tweets()).await;
+    futures_micro::or!(ctrl_c, tweets()).await.unwrap();
 }
 
 //ctrlc returns an error so tweets has to in order to match
@@ -115,6 +115,7 @@ async fn send(tweet: String) -> Result<(), SophonError> {
     Ok(())
 }
 
+#[derive(Debug)]
 enum SophonError {
     Internal,
     ContractAddress,
