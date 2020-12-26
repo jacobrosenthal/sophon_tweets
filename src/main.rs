@@ -8,7 +8,7 @@ use web3::contract::{Contract, Options};
 use web3::futures::TryFutureExt;
 use web3::types::U256;
 
-const STAGGER_DELAY: Duration = Duration::from_secs(60 * 60 * 8);
+const STAGGER_DELAY: Duration = Duration::from_secs(60 * 60 * 2);
 
 #[tokio::main]
 async fn main() {
@@ -24,7 +24,7 @@ async fn tweets() -> Result<(), SophonError> {
 
     let contract = Contract::from_json(
         web3.eth(),
-        "a8688cCF5E407C1C782CF0c19b3Ab2cE477Fd739".parse()?,
+        "678ACb78948Be7F354B28DaAb79B1ABD81574c1B".parse()?,
         // todo would be nice to grab the .abi directly from DarkForestCore.json
         include_bytes!("../DarkForest.abi"),
     )?;
