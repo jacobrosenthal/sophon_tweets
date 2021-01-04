@@ -73,13 +73,89 @@ async fn players(contract: Contract<web3::transports::Http>) -> Result<(), Sopho
 }
 
 async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), SophonError> {
-    let result = contract.query("getPlanetCounts", (), None, Options::default(), None);
-    let counts: Vec<U256> = result.compat().await?;
-    dbg!(counts.clone());
+    let result = contract.query(
+        "initializedPlanetCountByLevel",
+        (0_u32,),
+        None,
+        Options::default(),
+        None,
+    );
+    let zero: U256 = result.compat().await?;
+    dbg!(zero);
+
+    let result = contract.query(
+        "initializedPlanetCountByLevel",
+        (1_u32,),
+        None,
+        Options::default(),
+        None,
+    );
+    let one: U256 = result.compat().await?;
+    dbg!(one);
+
+    let result = contract.query(
+        "initializedPlanetCountByLevel",
+        (2_u32,),
+        None,
+        Options::default(),
+        None,
+    );
+    let two: U256 = result.compat().await?;
+    dbg!(two);
+
+    let result = contract.query(
+        "initializedPlanetCountByLevel",
+        (3_u32,),
+        None,
+        Options::default(),
+        None,
+    );
+    let three: U256 = result.compat().await?;
+    dbg!(three);
+
+    let result = contract.query(
+        "initializedPlanetCountByLevel",
+        (4_u32,),
+        None,
+        Options::default(),
+        None,
+    );
+    let four: U256 = result.compat().await?;
+    dbg!(four);
+
+    let result = contract.query(
+        "initializedPlanetCountByLevel",
+        (5_u32,),
+        None,
+        Options::default(),
+        None,
+    );
+    let five: U256 = result.compat().await?;
+    dbg!(five);
+
+    let result = contract.query(
+        "initializedPlanetCountByLevel",
+        (6_u32,),
+        None,
+        Options::default(),
+        None,
+    );
+    let six: U256 = result.compat().await?;
+    dbg!(six);
+
+    let result = contract.query(
+        "initializedPlanetCountByLevel",
+        (7_u32,),
+        None,
+        Options::default(),
+        None,
+    );
+    let seven: U256 = result.compat().await?;
+    dbg!(seven);
 
     let tweet = format!(
-        "Sophon 02369284 TX: Universe planet totals: {},{},{},{},{},{},{},{} #darkforest",
-        counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7]
+        "Sophon 02369284 TX: Universe planet totals: lvl0:{}, lvl1:{}, lvl2:{}, lvl3:{}, lvl4:{}, lvl5:{}, lvl6:{}, lvl7:{} #darkforest",
+        zero, one, two, three, four, five, six, seven
     );
 
     send(tweet).await?;
