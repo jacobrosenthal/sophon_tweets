@@ -3,7 +3,8 @@
 use reqwest::multipart;
 use reqwest_oauth1::OAuthClientProvider;
 use std::time::Duration;
-use tokio::time::delay_for;
+use tokio::time::sleep;
+use tokio_compat_02::FutureExt;
 use web3::contract::{Contract, Options};
 use web3::futures::TryFutureExt;
 use web3::types::U256;
@@ -30,18 +31,18 @@ async fn tweets() -> Result<(), SophonError> {
     )?;
 
     loop {
-        let _ = players(contract.clone()).await;
-        delay_for(STAGGER_DELAY).await;
-        let _ = radius(contract.clone()).await;
-        delay_for(STAGGER_DELAY).await;
         let _ = counts(contract.clone()).await;
-        delay_for(STAGGER_DELAY).await;
+        sleep(STAGGER_DELAY).await;
+        let _ = players(contract.clone()).await;
+        sleep(STAGGER_DELAY).await;
+        let _ = radius(contract.clone()).await;
+        sleep(STAGGER_DELAY).await;
     }
 }
 
 async fn radius(contract: Contract<web3::transports::Http>) -> Result<(), SophonError> {
     let result = contract.query("worldRadius", (), None, Options::default(), None);
-    let world_radius: U256 = result.await?;
+    let world_radius: U256 = result.compat().await?;
     let world_radius: u64 = world_radius.as_u64();
     dbg!(world_radius);
 
@@ -57,7 +58,7 @@ async fn radius(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
 
 async fn players(contract: Contract<web3::transports::Http>) -> Result<(), SophonError> {
     let result = contract.query("getNPlayers", (), None, Options::default(), None);
-    let n_players: U256 = result.await?;
+    let n_players: U256 = result.compat().await?;
     let n_players: u32 = n_players.as_u32();
     dbg!(n_players);
 
@@ -73,7 +74,7 @@ async fn players(contract: Contract<web3::transports::Http>) -> Result<(), Sopho
 
 async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), SophonError> {
     let result = contract.query("getPlanetCounts", (), None, Options::default(), None);
-    let counts: Vec<U256> = result.await?;
+    let counts: Vec<U256> = result.compat().await?;
     dbg!(counts.clone());
 
     let tweet = format!(
@@ -106,7 +107,9 @@ async fn send(tweet: String) -> Result<(), SophonError> {
         .post(endpoint)
         .multipart(content)
         .send()
-        .await?;
+        .compat()
+        .await
+        .unwrap();
 
     //todo, TwitterApiError here. but duplicate tweets, like if no planet totals have changed, will error, so just print
     if response.status() != 200 {
