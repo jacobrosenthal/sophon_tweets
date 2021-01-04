@@ -5,11 +5,11 @@ authors = ["Jacob Rosenthal <jacobrosenthal@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-tokio = { version = "0.2", features = ["full"] }
-web3 = { version = "0.13.0", default-features = false, features= ["http-tls"] }
-futures-micro = "0.3.1"
-url = "2.1.1"
+tokio = { version = "1.0.1", features = ["full"] }
+web3 = { version = "0.14.0", default-features = false, features = ["http-tls"] }
+futures-micro = "0.4.0"
+url = "2.2.0"
 reqwest-oauth1 = "0.1.0"
 rustc-hex = "2.1.0"
 ethabi = "12.0.0"
-reqwest = "0.10.8"
+reqwest = "0.10.10"

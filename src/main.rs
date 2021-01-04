@@ -3,7 +3,7 @@
 use reqwest::multipart;
 use reqwest_oauth1::OAuthClientProvider;
 use std::time::Duration;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 use web3::contract::{Contract, Options};
 use web3::futures::TryFutureExt;
 use web3::types::U256;
@@ -30,12 +30,12 @@ async fn tweets() -> Result<(), SophonError> {
     )?;
 
     loop {
-        let _ = players(contract.clone()).await;
-        delay_for(STAGGER_DELAY).await;
-        let _ = radius(contract.clone()).await;
-        delay_for(STAGGER_DELAY).await;
         let _ = counts(contract.clone()).await;
-        delay_for(STAGGER_DELAY).await;
+        sleep(STAGGER_DELAY).await;
+        let _ = players(contract.clone()).await;
+        sleep(STAGGER_DELAY).await;
+        let _ = radius(contract.clone()).await;
+        sleep(STAGGER_DELAY).await;
     }
 }
 
@@ -100,13 +100,18 @@ async fn send(tweet: String) -> Result<(), SophonError> {
 
     let content = multipart::Form::new().text("status", tweet);
 
+    dbg!("bfore");
+
     let response = reqwest::Client::new()
         // enable OAuth1 request
         .oauth1(secrets)
         .post(endpoint)
         .multipart(content)
         .send()
-        .await?;
+        .await
+        .unwrap();
+
+    dbg!("after");
 
     //todo, TwitterApiError here. but duplicate tweets, like if no planet totals have changed, will error, so just print
     if response.status() != 200 {
