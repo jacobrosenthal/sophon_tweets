@@ -6,12 +6,13 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::sleep;
 use tokio_compat_02::FutureExt;
-use web3::contract::{Contract, Options};
 use web3::futures::TryFutureExt;
-use web3::types::U256;
 
 mod graph;
 use graph::*;
+
+mod node;
+use node::*;
 
 const STAGGER_DELAY: Duration = Duration::from_secs(60 * 60 * 2);
 
@@ -78,32 +79,20 @@ async fn graph() -> Result<(), SophonError> {
 
 //ctrlc returns an error so tweets has to in order to match
 async fn tweets() -> Result<(), SophonError> {
-    let http = web3::transports::Http::new("https://rpc.xdaichain.com")?;
-    let web3 = web3::Web3::new(http);
-
-    let contract = Contract::from_json(
-        web3.eth(),
-        "678ACb78948Be7F354B28DaAb79B1ABD81574c1B".parse()?,
-        // todo would be nice to grab the .abi directly from DarkForestCore.json
-        include_bytes!("../DarkForest.abi"),
-    )?;
-
     loop {
-        let _ = counts(contract.clone()).await;
+        let _ = counts().await;
         sleep(STAGGER_DELAY).await;
-        let _ = players(contract.clone()).await;
+        let _ = players().await;
         sleep(STAGGER_DELAY).await;
-        let _ = radius(contract.clone()).await;
+        let _ = radius().await;
         sleep(STAGGER_DELAY).await;
         let _ = graph().await;
         sleep(STAGGER_DELAY).await;
     }
 }
 
-async fn radius(contract: Contract<web3::transports::Http>) -> Result<(), SophonError> {
-    let result = contract.query("worldRadius", (), None, Options::default(), None);
-    let world_radius: U256 = result.compat().await?;
-    let world_radius: u64 = world_radius.as_u64();
+async fn radius() -> Result<(), SophonError> {
+    let world_radius = df_radius().await.unwrap();
     dbg!(world_radius);
 
     let tweet = format!(
@@ -111,15 +100,11 @@ async fn radius(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         world_radius
     );
 
-    send(tweet).await?;
-
-    Ok(())
+    send(tweet).await
 }
 
-async fn players(contract: Contract<web3::transports::Http>) -> Result<(), SophonError> {
-    let result = contract.query("getNPlayers", (), None, Options::default(), None);
-    let n_players: U256 = result.compat().await?;
-    let n_players: u32 = n_players.as_u32();
+async fn players() -> Result<(), SophonError> {
+    let n_players = df_players().await.unwrap();
     dbg!(n_players);
 
     let tweet = format!(
@@ -127,100 +112,19 @@ async fn players(contract: Contract<web3::transports::Http>) -> Result<(), Sopho
         n_players
     );
 
-    send(tweet).await?;
-
-    Ok(())
+    send(tweet).await
 }
 
-async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), SophonError> {
-    let result = contract.query(
-        "initializedPlanetCountByLevel",
-        (0_u32,),
-        None,
-        Options::default(),
-        None,
-    );
-    let zero: U256 = result.compat().await?;
-    dbg!(zero);
-
-    let result = contract.query(
-        "initializedPlanetCountByLevel",
-        (1_u32,),
-        None,
-        Options::default(),
-        None,
-    );
-    let one: U256 = result.compat().await?;
-    dbg!(one);
-
-    let result = contract.query(
-        "initializedPlanetCountByLevel",
-        (2_u32,),
-        None,
-        Options::default(),
-        None,
-    );
-    let two: U256 = result.compat().await?;
-    dbg!(two);
-
-    let result = contract.query(
-        "initializedPlanetCountByLevel",
-        (3_u32,),
-        None,
-        Options::default(),
-        None,
-    );
-    let three: U256 = result.compat().await?;
-    dbg!(three);
-
-    let result = contract.query(
-        "initializedPlanetCountByLevel",
-        (4_u32,),
-        None,
-        Options::default(),
-        None,
-    );
-    let four: U256 = result.compat().await?;
-    dbg!(four);
-
-    let result = contract.query(
-        "initializedPlanetCountByLevel",
-        (5_u32,),
-        None,
-        Options::default(),
-        None,
-    );
-    let five: U256 = result.compat().await?;
-    dbg!(five);
-
-    let result = contract.query(
-        "initializedPlanetCountByLevel",
-        (6_u32,),
-        None,
-        Options::default(),
-        None,
-    );
-    let six: U256 = result.compat().await?;
-    dbg!(six);
-
-    let result = contract.query(
-        "initializedPlanetCountByLevel",
-        (7_u32,),
-        None,
-        Options::default(),
-        None,
-    );
-    let seven: U256 = result.compat().await?;
-    dbg!(seven);
+async fn counts() -> Result<(), SophonError> {
+    let counts = df_counts().await.unwrap();
+    dbg!(counts.clone());
 
     let tweet = format!(
         "Sophon 02369284 TX: Universe planet totals: lvl0:{}, lvl1:{}, lvl2:{}, lvl3:{}, lvl4:{}, lvl5:{}, lvl6:{}, lvl7:{} #darkforest",
-        zero, one, two, three, four, five, six, seven
+        counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7]
     );
 
-    send(tweet).await?;
-
-    Ok(())
+    send(tweet).await
 }
 
 async fn send(tweet: String) -> Result<(), SophonError> {
@@ -271,10 +175,6 @@ pub struct LastState {
 #[derive(Debug)]
 enum SophonError {
     Internal,
-    ContractAddress,
-    RPCUrl,
-    ContractAbi,
-    ContractResponseParse,
     TwitterUrl,
     HttpError,
     OAuth,
@@ -283,29 +183,6 @@ enum SophonError {
 impl From<std::io::Error> for SophonError {
     fn from(_err: std::io::Error) -> Self {
         SophonError::Internal
-    }
-}
-
-impl From<rustc_hex::FromHexError> for SophonError {
-    fn from(_err: rustc_hex::FromHexError) -> Self {
-        SophonError::ContractAddress
-    }
-}
-
-impl From<ethabi::Error> for SophonError {
-    fn from(_err: ethabi::Error) -> Self {
-        SophonError::ContractAbi
-    }
-}
-impl From<web3::Error> for SophonError {
-    fn from(_err: web3::Error) -> Self {
-        SophonError::RPCUrl
-    }
-}
-
-impl From<web3::contract::Error> for SophonError {
-    fn from(_err: web3::contract::Error) -> Self {
-        SophonError::ContractResponseParse
     }
 }
 
