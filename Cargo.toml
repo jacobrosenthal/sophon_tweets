@@ -17,7 +17,3 @@ reqwest = "0.10.10"
 serde_json = "1.0.60"
 serde = "1.0.118"
 num-bigint = { version = "0.3.1", features = ["serde"] }
-
-[[bin]]
-name = "graph"
-path = "src/graph.rs"

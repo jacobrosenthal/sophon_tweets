@@ -6,58 +6,32 @@ use tokio_compat_02::FutureExt;
 
 static URL: &str = "https://api.thegraph.com/subgraphs/name/jacobrosenthal/dark-forest-v05";
 
-#[tokio::main]
-async fn main() {
+pub async fn query_graph() -> Result<SophonQueryData, GraphError> {
     let mut headers = header::HeaderMap::new();
-    headers.insert("Content-Type", "application/json".parse().unwrap());
+    headers.insert(
+        "Content-Type",
+        "application/json".parse().map_err(GraphError::from)?,
+    );
 
     let body = json!({
         "query": QUERY,
     });
 
-    let body = serde_json::to_string(&body).unwrap();
+    let body = serde_json::to_string(&body).map_err(GraphError::from)?;
 
-    let res = reqwest::Client::new()
+    let response = reqwest::Client::new()
         .post(URL)
         .headers(headers)
         .body(body)
         .send()
         .compat()
         .await
-        .unwrap()
+        .map_err(GraphError::from)?
         .text()
         .await
-        .unwrap();
+        .map_err(GraphError::from)?;
 
-    if let Ok(res) = serde_json::from_str::<GraphData>(&res) {
-        let mut state = LastState::default();
-
-        println!("{:?}", res.data.arrivals);
-        println!("{:?}", res.data.df_meta);
-        println!("{:?}", res.data.graph_meta);
-
-        if res.data.arrivals.len() > state.most_arrivals_in_motion {
-            state.most_arrivals_in_motion = res.data.arrivals.len();
-        }
-
-        // sus
-        if res.data.df_meta.lastProcessed % 100000 == 0 {
-            // mod 100 000 move
-        }
-        state.last_processed = res.data.df_meta.lastProcessed;
-
-        for arrival in res.data.arrivals {
-            let longest_move = arrival.arrivalTime - arrival.departureTime;
-            if longest_move > state.longest_move {
-                state.longest_move = longest_move;
-            }
-
-            // Whale alert
-            if arrival.silverMoved > state.most_silver_in_motion {
-                state.most_silver_in_motion = arrival.silverMoved;
-            }
-        }
-    }
+    serde_json::from_str::<SophonQueryData>(response.as_str()).map_err(GraphError::from)
 }
 
 static QUERY: &str = r#"
@@ -88,99 +62,116 @@ query sophon {
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct Arrival {
-    id: String,
-    arrivalId: u32,
-    arrivalTime: u32,
-    departureTime: u32,
-    receivedAt: u32,
-    energyArriving: u32,
-    processedAt: Option<u32>,
-    silverMoved: u32,
+pub struct Arrival {
+    pub id: String,
+    pub arrivalId: u32,
+    pub arrivalTime: u32,
+    pub departureTime: u32,
+    pub receivedAt: u32,
+    pub energyArriving: u32,
+    pub processedAt: Option<u32>,
+    pub silverMoved: u32,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct Player {
-    id: String,
-    initTimestamp: u32,
-    homeWorld: Option<Planet>,
-    planets: Vec<Planet>,
+pub struct Player {
+    pub id: String,
+    pub initTimestamp: u32,
+    pub homeWorld: Option<Planet>,
+    pub planets: Vec<Planet>,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct Planet {
-    id: String,
-    locationDec: BigUint,
-    isInitialized: bool,
-    createdAt: u32,
-    lastUpdated: u32,
-    perlin: u32,
-    range: u32,
-    speed: u32,
-    defense: u32,
-    energyLazy: u32,
-    energyCap: u32,
-    energyGrowth: u32,
-    silverCap: u32,
-    silverGrowth: u32,
-    silverLazy: u32,
-    planetLevel: u32,
-    rangeUpgrades: u32,
-    speedUpgrades: u32,
-    defenseUpgrades: u32,
-    isEnergyCapBoosted: bool,
-    isSpeedBoosted: bool,
-    isDefenseBoosted: bool,
-    isRangeBoosted: bool,
-    isEnergyGrowthBoosted: bool,
-    hatLevel: u32,
-    planetResource: String,
-    spaceType: String,
-    silverSpentComputed: u32,
-    owner: serde_json::Value,
+pub struct Planet {
+    pub id: String,
+    pub locationDec: BigUint,
+    pub isInitialized: bool,
+    pub createdAt: u32,
+    pub lastUpdated: u32,
+    pub perlin: u32,
+    pub range: u32,
+    pub speed: u32,
+    pub defense: u32,
+    pub energyLazy: u32,
+    pub energyCap: u32,
+    pub energyGrowth: u32,
+    pub silverCap: u32,
+    pub silverGrowth: u32,
+    pub silverLazy: u32,
+    pub planetLevel: u32,
+    pub rangeUpgrades: u32,
+    pub speedUpgrades: u32,
+    pub defenseUpgrades: u32,
+    pub isEnergyCapBoosted: bool,
+    pub isSpeedBoosted: bool,
+    pub isDefenseBoosted: bool,
+    pub isRangeBoosted: bool,
+    pub isEnergyGrowthBoosted: bool,
+    pub hatLevel: u32,
+    pub planetResource: String,
+    pub spaceType: String,
+    pub silverSpentComputed: u32,
+    pub owner: serde_json::Value,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct GraphMeta {
-    hasIndexingErrors: bool,
-    deployment: String,
-    block: Block,
+pub struct GraphMeta {
+    pub hasIndexingErrors: bool,
+    pub deployment: String,
+    pub block: Block,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct DarkForestMeta {
-    lastProcessed: u32,
+pub struct DarkForestMeta {
+    pub lastProcessed: u32,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct Block {
-    number: u32,
-    hash: String,
+pub struct Block {
+    pub number: u32,
+    pub hash: String,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct GraphData {
-    data: SophonQueryData,
+pub struct GraphData {
+    pub data: SophonQueryData,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct SophonQueryData {
-    arrivals: Vec<Arrival>,
-    graph_meta: GraphMeta,
-    df_meta: DarkForestMeta,
+pub struct SophonQueryData {
+    pub arrivals: Vec<Arrival>,
+    pub graph_meta: GraphMeta,
+    pub df_meta: DarkForestMeta,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
-struct LastState {
-    last_processed: u32,            // mod 100 000 move
-    most_arrivals_in_motion: usize, // count arrivalsQueues
-    longest_move: u32,              // arrivaltime-departuretime
-    most_silver_in_motion: u32,     // Whale alert
+#[derive(Debug)]
+pub enum GraphError {
+    Internal,
+    JsonError,
+    HttpError,
+}
+
+impl From<reqwest::Error> for GraphError {
+    fn from(_err: reqwest::Error) -> Self {
+        GraphError::HttpError
+    }
+}
+
+impl From<reqwest::header::InvalidHeaderValue> for GraphError {
+    fn from(_err: reqwest::header::InvalidHeaderValue) -> Self {
+        GraphError::Internal
+    }
+}
+
+impl From<serde_json::Error> for GraphError {
+    fn from(_err: serde_json::Error) -> Self {
+        GraphError::JsonError
+    }
 }

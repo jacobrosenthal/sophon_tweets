@@ -2,12 +2,16 @@
 
 use reqwest::multipart;
 use reqwest_oauth1::OAuthClientProvider;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::sleep;
 use tokio_compat_02::FutureExt;
 use web3::contract::{Contract, Options};
 use web3::futures::TryFutureExt;
 use web3::types::U256;
+
+mod graph;
+use graph::*;
 
 const STAGGER_DELAY: Duration = Duration::from_secs(60 * 60 * 2);
 
@@ -16,6 +20,60 @@ async fn main() {
     let ctrl_c = tokio::signal::ctrl_c().map_err(SophonError::from);
 
     futures_micro::or!(ctrl_c, tweets()).await.unwrap();
+}
+
+async fn graph() -> Result<(), SophonError> {
+    let res = query_graph().await.unwrap();
+
+    let mut state = LastState::default();
+
+    println!("{:?}", res.arrivals);
+    println!("{:?}", res.df_meta);
+    println!("{:?}", res.graph_meta);
+
+    let significant = ((res.df_meta.lastProcessed % 100000) + 100000) % 100000;
+    if significant > state.significant_arrival {
+        let tweet = format!(
+            "Sophon bacd4f81 TX: {}th departure detected #darkforest",
+            significant
+        );
+
+        state.tweets.push(tweet);
+
+        state.significant_arrival = significant;
+    }
+
+    if res.arrivals.len() > state.most_arrivals_in_motion {
+        let tweet = format!(
+            "Sophon ec1b89f9 TX: Unusually high activity {} in motion #darkforest",
+            res.arrivals.len()
+        );
+
+        state.tweets.push(tweet);
+
+        state.most_arrivals_in_motion = res.arrivals.len();
+    }
+
+    for arrival in res.arrivals {
+        let longest_move = arrival.arrivalTime - arrival.departureTime;
+        if longest_move > state.longest_move {
+            state.longest_move = longest_move;
+        }
+
+        // Whale alert
+        if arrival.silverMoved > state.most_silver_in_motion {
+            let tweet = format!(
+                "Sophon 06cfe9ac TX: Whale alert {} silver in motion #darkforest",
+                res.df_meta.lastProcessed % 100000
+            );
+
+            state.tweets.push(tweet);
+
+            state.most_silver_in_motion = arrival.silverMoved;
+        }
+    }
+
+    Ok(())
 }
 
 //ctrlc returns an error so tweets has to in order to match
@@ -36,6 +94,8 @@ async fn tweets() -> Result<(), SophonError> {
         let _ = players(contract.clone()).await;
         sleep(STAGGER_DELAY).await;
         let _ = radius(contract.clone()).await;
+        sleep(STAGGER_DELAY).await;
+        let _ = graph().await;
         sleep(STAGGER_DELAY).await;
     }
 }
@@ -192,6 +252,20 @@ async fn send(tweet: String) -> Result<(), SophonError> {
         dbg!(response.text().await.unwrap());
     }
     Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct LastState {
+    /// count of unprocessed arrivalsQueues
+    most_arrivals_in_motion: usize,
+    /// n hundred thousandth arrival
+    significant_arrival: u32,
+    /// arrivaltime-departuretime
+    longest_move: u32,
+    /// Whale alert
+    most_silver_in_motion: u32,
+    /// tweets scheduled to go out
+    tweets: Vec<String>,
 }
 
 #[derive(Debug)]
