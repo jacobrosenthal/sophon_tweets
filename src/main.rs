@@ -4,6 +4,7 @@ use reqwest::multipart;
 use reqwest_oauth1::OAuthClientProvider;
 use std::time::Duration;
 use tokio::time::sleep;
+use tokio_compat_02::FutureExt;
 use web3::contract::{Contract, Options};
 use web3::futures::TryFutureExt;
 use web3::types::U256;
@@ -41,7 +42,7 @@ async fn tweets() -> Result<(), SophonError> {
 
 async fn radius(contract: Contract<web3::transports::Http>) -> Result<(), SophonError> {
     let result = contract.query("worldRadius", (), None, Options::default(), None);
-    let world_radius: U256 = result.await?;
+    let world_radius: U256 = result.compat().await?;
     let world_radius: u64 = world_radius.as_u64();
     dbg!(world_radius);
 
@@ -57,7 +58,7 @@ async fn radius(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
 
 async fn players(contract: Contract<web3::transports::Http>) -> Result<(), SophonError> {
     let result = contract.query("getNPlayers", (), None, Options::default(), None);
-    let n_players: U256 = result.await?;
+    let n_players: U256 = result.compat().await?;
     let n_players: u32 = n_players.as_u32();
     dbg!(n_players);
 
@@ -79,7 +80,7 @@ async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         Options::default(),
         None,
     );
-    let zero: U256 = result.await?;
+    let zero: U256 = result.compat().await?;
     dbg!(zero);
 
     let result = contract.query(
@@ -89,7 +90,7 @@ async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         Options::default(),
         None,
     );
-    let one: U256 = result.await?;
+    let one: U256 = result.compat().await?;
     dbg!(one);
 
     let result = contract.query(
@@ -99,7 +100,7 @@ async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         Options::default(),
         None,
     );
-    let two: U256 = result.await?;
+    let two: U256 = result.compat().await?;
     dbg!(two);
 
     let result = contract.query(
@@ -109,7 +110,7 @@ async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         Options::default(),
         None,
     );
-    let three: U256 = result.await?;
+    let three: U256 = result.compat().await?;
     dbg!(three);
 
     let result = contract.query(
@@ -119,7 +120,7 @@ async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         Options::default(),
         None,
     );
-    let four: U256 = result.await?;
+    let four: U256 = result.compat().await?;
     dbg!(four);
 
     let result = contract.query(
@@ -129,7 +130,7 @@ async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         Options::default(),
         None,
     );
-    let five: U256 = result.await?;
+    let five: U256 = result.compat().await?;
     dbg!(five);
 
     let result = contract.query(
@@ -139,7 +140,7 @@ async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         Options::default(),
         None,
     );
-    let six: U256 = result.await?;
+    let six: U256 = result.compat().await?;
     dbg!(six);
 
     let result = contract.query(
@@ -149,7 +150,7 @@ async fn counts(contract: Contract<web3::transports::Http>) -> Result<(), Sophon
         Options::default(),
         None,
     );
-    let seven: U256 = result.await?;
+    let seven: U256 = result.compat().await?;
     dbg!(seven);
 
     let tweet = format!(
@@ -176,18 +177,15 @@ async fn send(tweet: String) -> Result<(), SophonError> {
 
     let content = multipart::Form::new().text("status", tweet);
 
-    dbg!("bfore");
-
     let response = reqwest::Client::new()
         // enable OAuth1 request
         .oauth1(secrets)
         .post(endpoint)
         .multipart(content)
         .send()
+        .compat()
         .await
         .unwrap();
-
-    dbg!("after");
 
     //todo, TwitterApiError here. but duplicate tweets, like if no planet totals have changed, will error, so just print
     if response.status() != 200 {

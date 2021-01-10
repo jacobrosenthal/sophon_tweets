@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 tokio = { version = "1.0.1", features = ["full"] }
+tokio-compat-02 = "0.1.2"
 web3 = { version = "0.14.0", default-features = false, features = ["http-tls"] }
 futures-micro = "0.4.0"
 url = "2.2.0"
