@@ -100,7 +100,7 @@ async fn collect_from_graph(chan: Sender<String>) -> Result<(), SophonError> {
                     state.longest_move = longest_move;
                 }
 
-                if arrival.silverMoved > state.most_silver_in_motion {
+                if arrival.milliSilverMoved > state.most_silver_in_motion {
                     let tweet = format!(
                         "Sophon 06cfe9ac TX: Whale alert {} silver in motion #darkforest",
                         res.df_meta.lastProcessed % 100000
@@ -108,7 +108,7 @@ async fn collect_from_graph(chan: Sender<String>) -> Result<(), SophonError> {
 
                     let _ = chan.send(tweet);
 
-                    state.most_silver_in_motion = arrival.silverMoved;
+                    state.most_silver_in_motion = arrival.milliSilverMoved;
                     dirty = true;
                 }
             }
@@ -197,9 +197,9 @@ pub struct GraphState {
     most_arrivals_in_motion: usize,
     /// n hundred thousandth arrival
     significant_arrival: u32,
-    /// arrivaltime-departuretime
+    /// arrivaltime-departuretime in seconds
     longest_move: u32,
-    /// Whale alert
+    /// Whale alert in millisilver
     most_silver_in_motion: u32,
     /// how many users in system
     last_user_count: u32,

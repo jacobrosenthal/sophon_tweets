@@ -42,9 +42,9 @@ query sophon {
         arrivalTime
         departureTime
         receivedAt
-        energyArriving
+        milliEnergyArriving
         processedAt
-        silverMoved
+        milliSilverMoved
     }
     df_meta: meta(id: 0) {
         lastProcessed
@@ -68,9 +68,9 @@ pub struct Arrival {
     pub arrivalTime: u32,
     pub departureTime: u32,
     pub receivedAt: u32,
-    pub energyArriving: u32,
+    pub milliEnergyArriving: u32,
     pub processedAt: Option<u32>,
-    pub silverMoved: u32,
+    pub milliSilverMoved: u32,
 }
 
 #[allow(non_snake_case)]
@@ -94,25 +94,25 @@ pub struct Planet {
     pub range: u32,
     pub speed: u32,
     pub defense: u32,
-    pub energyLazy: u32,
-    pub energyCap: u32,
-    pub energyGrowth: u32,
-    pub silverCap: u32,
-    pub silverGrowth: u32,
-    pub silverLazy: u32,
+    pub milliEnergyLazy: u32,
+    pub milliEnergyCap: u32,
+    pub milliEnergyGrowth: u32,
+    pub milliSilverCap: u32,
+    pub milliSilverGrowth: u32,
+    pub milliSilverLazy: u32,
     pub planetLevel: u32,
     pub rangeUpgrades: u32,
     pub speedUpgrades: u32,
     pub defenseUpgrades: u32,
-    pub isEnergyCapBoosted: bool,
+    pub ismilliEnergyCapBoosted: bool,
     pub isSpeedBoosted: bool,
     pub isDefenseBoosted: bool,
     pub isRangeBoosted: bool,
-    pub isEnergyGrowthBoosted: bool,
+    pub ismilliEnergyGrowthBoosted: bool,
     pub hatLevel: u32,
     pub planetResource: String,
     pub spaceType: String,
-    pub silverSpentComputed: u32,
+    pub milliSilverSpent: u32,
     pub owner: serde_json::Value,
 }
 
