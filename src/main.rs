@@ -31,9 +31,9 @@ async fn main() {
 
     futures_micro::or!(
         ctrl_c,
-        tweets(receiver),                   //STAGGER_DELAY
         collect_from_graph(sender.clone()), //COLLECT_DELAY
         collect_from_node(sender.clone()),  //COLLECT_DELAY
+        tweets(receiver),                   //STAGGER_DELAY
         tweet_counts()                      //COUNTS_DELAY
     )
     .await
@@ -49,6 +49,8 @@ async fn tweets(chan: Receiver<String>) -> Result<(), SophonError> {
         while let Ok(tweet) = chan.recv() {
             tweets.push_back(tweet);
         }
+
+        dbg!(tweets.clone());
 
         // send a tweet if available
         if let Some(tweet) = tweets.pop_front() {
@@ -103,7 +105,7 @@ async fn collect_from_graph(chan: Sender<String>) -> Result<(), SophonError> {
                 if arrival.milliSilverMoved > state.most_silver_in_motion {
                     let tweet = format!(
                         "Sophon 06cfe9ac TX: Whale alert {} silver in motion #darkforest",
-                        res.df_meta.lastProcessed % 100000
+                        arrival.milliSilverMoved / 1000
                     );
 
                     let _ = chan.send(tweet);
