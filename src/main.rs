@@ -1,11 +1,8 @@
 //! `cargo run consumer_key consumer_secret_key access_token secret_access_token`
 
-use reqwest::multipart;
-use reqwest_oauth1::OAuthClientProvider;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::sleep;
-use tokio_compat_02::FutureExt;
 use web3::futures::TryFutureExt;
 
 mod graph;
@@ -13,6 +10,9 @@ use graph::*;
 
 mod node;
 use node::*;
+
+mod twitter;
+use twitter::*;
 
 const STAGGER_DELAY: Duration = Duration::from_secs(60 * 60 * 2);
 
@@ -91,7 +91,7 @@ async fn tweets() -> Result<(), SophonError> {
     }
 }
 
-async fn radius() -> Result<(), SophonError> {
+async fn radius() -> Result<(), TwitterError> {
     let world_radius = df_radius().await.unwrap();
     dbg!(world_radius);
 
@@ -100,10 +100,12 @@ async fn radius() -> Result<(), SophonError> {
         world_radius
     );
 
-    send(tweet).await
+    send(tweet).await.unwrap();
+
+    Ok(())
 }
 
-async fn players() -> Result<(), SophonError> {
+async fn players() -> Result<(), TwitterError> {
     let n_players = df_players().await.unwrap();
     dbg!(n_players);
 
@@ -112,10 +114,12 @@ async fn players() -> Result<(), SophonError> {
         n_players
     );
 
-    send(tweet).await
+    send(tweet).await.unwrap();
+
+    Ok(())
 }
 
-async fn counts() -> Result<(), SophonError> {
+async fn counts() -> Result<(), TwitterError> {
     let counts = df_counts().await.unwrap();
     dbg!(counts.clone());
 
@@ -124,37 +128,8 @@ async fn counts() -> Result<(), SophonError> {
         counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7]
     );
 
-    send(tweet).await
-}
+    send(tweet).await.unwrap();
 
-async fn send(tweet: String) -> Result<(), SophonError> {
-    let args: Vec<String> = std::env::args().collect();
-    let consumer_key = args[1].clone();
-    let consumer_secret_key = args[2].clone();
-    let access_token = args[3].clone();
-    let secret_access_token = args[4].clone();
-
-    let secrets = reqwest_oauth1::Secrets::new(consumer_key, consumer_secret_key)
-        .token(access_token, secret_access_token);
-
-    let endpoint = "https://api.twitter.com/1.1/statuses/update.json";
-
-    let content = multipart::Form::new().text("status", tweet);
-
-    let response = reqwest::Client::new()
-        // enable OAuth1 request
-        .oauth1(secrets)
-        .post(endpoint)
-        .multipart(content)
-        .send()
-        .compat()
-        .await
-        .unwrap();
-
-    //todo, TwitterApiError here. but duplicate tweets, like if no planet totals have changed, will error, so just print
-    if response.status() != 200 {
-        dbg!(response.text().await.unwrap());
-    }
     Ok(())
 }
 
@@ -175,31 +150,10 @@ pub struct LastState {
 #[derive(Debug)]
 enum SophonError {
     Internal,
-    TwitterUrl,
-    HttpError,
-    OAuth,
 }
 
 impl From<std::io::Error> for SophonError {
     fn from(_err: std::io::Error) -> Self {
         SophonError::Internal
-    }
-}
-
-impl From<url::ParseError> for SophonError {
-    fn from(_err: url::ParseError) -> Self {
-        SophonError::TwitterUrl
-    }
-}
-
-impl From<reqwest::Error> for SophonError {
-    fn from(_err: reqwest::Error) -> Self {
-        SophonError::HttpError
-    }
-}
-
-impl From<reqwest_oauth1::Error> for SophonError {
-    fn from(_err: reqwest_oauth1::Error) -> Self {
-        SophonError::OAuth
     }
 }
