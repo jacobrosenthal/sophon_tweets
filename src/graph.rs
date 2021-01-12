@@ -1,4 +1,4 @@
-use num_bigint::BigUint;
+// use num_bigint::BigUint;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, json};
@@ -6,7 +6,7 @@ use tokio_compat_02::FutureExt;
 
 static URL: &str = "https://api.thegraph.com/subgraphs/name/jacobrosenthal/dark-forest-v05";
 
-pub async fn query_graph() -> Result<SophonQueryData, GraphError> {
+pub async fn query_graph(hat_level: u32) -> Result<SophonQueryData, GraphError> {
     let mut headers = header::HeaderMap::new();
     headers.insert(
         "Content-Type",
@@ -15,6 +15,9 @@ pub async fn query_graph() -> Result<SophonQueryData, GraphError> {
 
     let body = json!({
         "query": QUERY,
+        "variables": {
+            "hat_level": hat_level
+        }
     });
 
     let body = serde_json::to_string(&body).map_err(GraphError::from)?;
@@ -35,7 +38,7 @@ pub async fn query_graph() -> Result<SophonQueryData, GraphError> {
 }
 
 static QUERY: &str = r#"
-query sophon {
+query sophon($hat_level: Int!) {
     arrivals(where: {processedAt: null}, orderBy: arrivalTime, orderDirection: asc) {
         id
         arrivalId
@@ -45,11 +48,26 @@ query sophon {
         milliEnergyArriving
         processedAt
         milliSilverMoved
+        player {
+          id
+          initTimestamp
+        }
+    }
+    hats(first: 1, where: {hatLevel_gt: $hat_level}, orderBy:hatLevel, orderDirection:asc) {
+        id
+        hatLevel
+        planet {
+          id
+        }
+        player {
+          id
+          initTimestamp
+        }
     }
     df_meta: meta(id: 0) {
         lastProcessed
     }
-    graph_meta: _meta{
+    graph_meta: _meta {
         deployment
         hasIndexingErrors
         block{
@@ -71,6 +89,7 @@ pub struct Arrival {
     pub milliEnergyArriving: u32,
     pub processedAt: Option<u32>,
     pub milliSilverMoved: u32,
+    pub player: Player,
 }
 
 #[allow(non_snake_case)]
@@ -78,42 +97,52 @@ pub struct Arrival {
 pub struct Player {
     pub id: String,
     pub initTimestamp: u32,
-    pub homeWorld: Option<Planet>,
-    pub planets: Vec<Planet>,
+    // pub homeWorld: Option<Planet>,
+    // pub planets: Vec<Planet>,
+}
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Hat {
+    pub id: String,
+    pub planet: Planet,
+    pub player: Player,
+    pub hatLevel: u32,
+    pub timestamp: u32,
 }
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Planet {
     pub id: String,
-    pub locationDec: BigUint,
-    pub isInitialized: bool,
-    pub createdAt: u32,
-    pub lastUpdated: u32,
-    pub perlin: u32,
-    pub range: u32,
-    pub speed: u32,
-    pub defense: u32,
-    pub milliEnergyLazy: u32,
-    pub milliEnergyCap: u32,
-    pub milliEnergyGrowth: u32,
-    pub milliSilverCap: u32,
-    pub milliSilverGrowth: u32,
-    pub milliSilverLazy: u32,
-    pub planetLevel: u32,
-    pub rangeUpgrades: u32,
-    pub speedUpgrades: u32,
-    pub defenseUpgrades: u32,
-    pub ismilliEnergyCapBoosted: bool,
-    pub isSpeedBoosted: bool,
-    pub isDefenseBoosted: bool,
-    pub isRangeBoosted: bool,
-    pub ismilliEnergyGrowthBoosted: bool,
-    pub hatLevel: u32,
-    pub planetResource: String,
-    pub spaceType: String,
-    pub milliSilverSpent: u32,
-    pub owner: serde_json::Value,
+    // pub locationDec: BigUint,
+    // pub isInitialized: bool,
+    // pub createdAt: u32,
+    // pub lastUpdated: u32,
+    // pub perlin: u32,
+    // pub range: u32,
+    // pub speed: u32,
+    // pub defense: u32,
+    // pub milliEnergyLazy: u32,
+    // pub milliEnergyCap: u32,
+    // pub milliEnergyGrowth: u32,
+    // pub milliSilverCap: u32,
+    // pub milliSilverGrowth: u32,
+    // pub milliSilverLazy: u32,
+    // pub planetLevel: u32,
+    // pub rangeUpgrades: u32,
+    // pub speedUpgrades: u32,
+    // pub defenseUpgrades: u32,
+    // pub ismilliEnergyCapBoosted: bool,
+    // pub isSpeedBoosted: bool,
+    // pub isDefenseBoosted: bool,
+    // pub isRangeBoosted: bool,
+    // pub ismilliEnergyGrowthBoosted: bool,
+    // pub hatLevel: u32,
+    // pub planetResource: String,
+    // pub spaceType: String,
+    // pub milliSilverSpent: u32,
+    // pub owner: serde_json::Value,
 }
 
 #[allow(non_snake_case)]
@@ -149,6 +178,7 @@ pub struct SophonQueryData {
     pub arrivals: Vec<Arrival>,
     pub graph_meta: GraphMeta,
     pub df_meta: DarkForestMeta,
+    pub hats: Vec<Hat>,
 }
 
 #[derive(Debug)]

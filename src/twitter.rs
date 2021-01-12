@@ -23,12 +23,13 @@ pub async fn send(tweet: String) -> Result<(), TwitterError> {
         .multipart(content)
         .send()
         .compat()
-        .await
-        .unwrap();
+        .await?;
 
     //todo, TwitterApiError here. but duplicate tweets, like if no planet totals have changed, will error, so just print
     if response.status() != 200 {
-        dbg!(response.text().await.unwrap());
+        return Err(TwitterError::HttpError(
+            response.text().await.unwrap_or_default(),
+        ));
     }
     Ok(())
 }
@@ -36,7 +37,7 @@ pub async fn send(tweet: String) -> Result<(), TwitterError> {
 #[derive(Debug)]
 pub enum TwitterError {
     Internal,
-    HttpError,
+    HttpError(String),
     OAuth,
     TwitterUrl,
 }
@@ -54,8 +55,8 @@ impl From<url::ParseError> for TwitterError {
 }
 
 impl From<reqwest::Error> for TwitterError {
-    fn from(_err: reqwest::Error) -> Self {
-        TwitterError::HttpError
+    fn from(err: reqwest::Error) -> Self {
+        TwitterError::HttpError(err.to_string())
     }
 }
 

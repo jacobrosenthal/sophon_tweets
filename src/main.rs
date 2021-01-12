@@ -71,7 +71,7 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
     loop {
         let mut share = wrapped_state.lock().await;
 
-        if let Ok(res) = query_graph().await {
+        if let Ok(res) = query_graph(share.state.hat_level).await {
             dbg!(res.arrivals.clone());
             dbg!(res.df_meta.clone());
             dbg!(res.graph_meta.clone());
@@ -101,6 +101,18 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
                 dirty = true;
             }
 
+            if !res.hats.is_empty() {
+                let tweet = format!(
+                    "Sophon c2463284 TX: {} has discovered lvl {} hat technology #darkforest",
+                    res.hats[0].player.id, res.hats[0].hatLevel
+                );
+
+                share.state.tweets.push_back(tweet);
+
+                share.state.hat_level = res.hats[0].hatLevel;
+                dirty = true;
+            }
+
             for arrival in res.arrivals {
                 let longest_move = arrival.arrivalTime - arrival.departureTime;
                 if longest_move > share.state.longest_move {
@@ -109,8 +121,9 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
 
                 if arrival.milliSilverMoved > share.state.most_silver_in_motion {
                     let tweet = format!(
-                        "Sophon 06cfe9ac TX: Whale alert {} silver in motion #darkforest",
-                        arrival.milliSilverMoved / 1000
+                        "Sophon 06cfe9ac TX: Whale alert {} moving {} in silver #darkforest",
+                        arrival.player.id,
+                        arrival.milliSilverMoved / 1000,
                     );
 
                     share.state.tweets.push_back(tweet);
@@ -202,7 +215,7 @@ pub struct SophonShare {
     state: SophonState,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct SophonState {
     /// count of unprocessed arrivalsQueues
     most_arrivals_in_motion: usize,
@@ -216,6 +229,8 @@ pub struct SophonState {
     last_user_count: u32,
     /// last reported world radius
     last_radius: u64,
+    /// biggest hat
+    hat_level: u32,
     /// scheduled tweets
     tweets: VecDeque<String>,
 }
