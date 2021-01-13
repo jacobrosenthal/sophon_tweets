@@ -6,14 +6,14 @@ edition = "2018"
 
 [dependencies]
 tokio = { version = "1.0.1", features = ["full"] }
-tokio-compat-02 = "0.1.2"
-web3 = { version = "0.14.0", default-features = false, features = ["http-tls"] }
+tokio-compat-02 = "0.2.0"
+web3 = { version = "0.15.0", default-features = false, features = ["http-tls"] }
 futures-micro = "0.4.0"
 url = "2.2.0"
 reqwest-oauth1 = "0.1.0"
 rustc-hex = "2.1.0"
-ethabi = "12.0.0"
+ethabi = "13.0.0"
 reqwest = "0.10.10"
-serde_json = "1.0.60"
-serde = "1.0.118"
+serde_json = "1.0.61"
+serde = "1.0.119"
 num-bigint = { version = "0.3.1", features = ["serde"] }
