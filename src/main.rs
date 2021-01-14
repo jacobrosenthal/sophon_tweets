@@ -18,8 +18,10 @@ mod twitter;
 use twitter::*;
 
 const STAGGER_DELAY: Duration = Duration::from_secs(60 * 60);
-const COUNTS_DELAY: Duration = Duration::from_secs(60 * 45);
 const COLLECT_DELAY: Duration = Duration::from_secs(60 * 30);
+
+const RADIUS_DELAY: Duration = Duration::from_secs(60 * 60 * 12);
+const COUNTS_DELAY: Duration = Duration::from_secs(60 * 60 * 12);
 
 const STATE_FILE: &str = "sophon_state.json";
 
@@ -36,7 +38,8 @@ async fn main() {
         collect_from_graph(wrapped_state.clone()), //COLLECT_DELAY
         collect_from_node(wrapped_state.clone()),  //COLLECT_DELAY
         tweets(wrapped_state.clone()),             //STAGGER_DELAY
-        tweet_counts()                             //COUNTS_DELAY
+        tweet_counts(),                            //COUNTS_DELAY
+        tweet_radius()                             //RADIUS_DELAY
     )
     .await
     .unwrap();
@@ -45,18 +48,20 @@ async fn main() {
 // ctrlc returns an error so tweets has to in order to match
 async fn tweets(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<(), SophonError> {
     loop {
-        // send a tweet if available
-        let mut share = wrapped_state.lock().await;
+        // scope for mutex release
+        {
+            let mut share = wrapped_state.lock().await;
 
-        // peek first element
-        if let Some(tweet) = share.state.tweets.get(0) {
-            // if it sends successfully, pop it to remove it
-            if send(tweet.to_owned()).await.is_ok() {
-                share.state.tweets.pop_front();
+            // send a tweet if available
+            if let Some(tweet) = share.state.tweets.get(0) {
+                // if it sends successfully, pop it to remove it
+                if send(tweet.to_owned()).await.is_ok() {
+                    share.state.tweets.pop_front();
 
-                // mutated state so save to disk
-                if let Ok(state_json) = serde_json::to_string(&share.state) {
-                    let _ = std::fs::write(STATE_FILE, state_json);
+                    // mutated state so save to disk
+                    if let Ok(state_json) = serde_json::to_string(&share.state) {
+                        let _ = std::fs::write(STATE_FILE, state_json);
+                    }
                 }
             }
         }
@@ -69,79 +74,84 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
     let mut dirty = false;
 
     loop {
-        let mut share = wrapped_state.lock().await;
+        // scope for mutex release
+        {
+            let mut share = wrapped_state.lock().await;
 
-        if let Ok(res) = query_graph(share.state.hat_level).await {
-            dbg!(res.arrivals.clone());
-            dbg!(res.df_meta.clone());
-            dbg!(res.graph_meta.clone());
+            if let Ok(res) = query_graph(share.state.hat_level).await {
+                dbg!(res.df_meta.clone());
+                if !res.graph_meta.hasIndexingErrors {
+                    if let Some(arrival) = res.arrivals.last() {
 
-            let significant = ((res.df_meta.lastProcessed % 100000) + 100000) % 100000;
-            if significant > share.state.significant_arrival {
-                let tweet = format!(
-                    "Sophon bacd4f81 TX: {}th departure detected #darkforest",
-                    significant
-                );
+                        let significant = (arrival.arrivalId / 100000) * 100000;
+                        if significant > share.state.significant_arrival {
+                            let tweet = format!(
+                                "Sophon bacd4f81 TX: {}th departure detected #darkforest",
+                                significant
+                            );
 
-                share.state.tweets.push_back(tweet);
+                            share.state.tweets.push_back(tweet);
 
-                share.state.significant_arrival = significant;
-                dirty = true;
-            }
+                            share.state.significant_arrival = significant;
+                            dirty = true;
+                        }
+                    }
 
-            if res.arrivals.len() > share.state.most_arrivals_in_motion {
-                let tweet = format!(
-                    "Sophon ec1b89f9 TX: Unusually high activity {} movements detected #darkforest",
-                    res.arrivals.len()
-                );
-
-                share.state.tweets.push_back(tweet);
-
-                share.state.most_arrivals_in_motion = res.arrivals.len();
-                dirty = true;
-            }
-
-            if !res.hats.is_empty() {
-                let tweet = format!(
-                    "Sophon c2463284 TX: {} has discovered lvl {} hat technology #darkforest",
-                    res.hats[0].player.id, res.hats[0].hatLevel
-                );
-
-                share.state.tweets.push_back(tweet);
-
-                share.state.hat_level = res.hats[0].hatLevel;
-                dirty = true;
-            }
-
-            for arrival in res.arrivals {
-                let longest_move = arrival.arrivalTime - arrival.departureTime;
-                if longest_move > share.state.longest_move {
-                    share.state.longest_move = longest_move;
-                }
-
-                if arrival.milliSilverMoved > share.state.most_silver_in_motion {
-                    let tweet = format!(
-                        "Sophon 06cfe9ac TX: Whale alert {} moving {} in silver #darkforest",
-                        arrival.player.id,
-                        arrival.milliSilverMoved / 1000,
+                    if res.arrivals.len() > share.state.most_arrivals_in_motion {
+                        let tweet = format!(
+                        "Sophon ec1b89f9 TX: Unusually high activity {} movements detected #darkforest",
+                        res.arrivals.len()
                     );
 
-                    share.state.tweets.push_back(tweet);
+                        share.state.tweets.push_back(tweet);
 
-                    share.state.most_silver_in_motion = arrival.milliSilverMoved;
-                    dirty = true;
+                        share.state.most_arrivals_in_motion = res.arrivals.len();
+                        dirty = true;
+                    }
+
+                    if !res.hats.is_empty() {
+                        let tweet = format!(
+                            "Sophon c2463284 TX: {} has discovered lvl {} hat technology #darkforest",
+                            res.hats[0].player.id, res.hats[0].hatLevel
+                        );
+
+                        share.state.tweets.push_back(tweet);
+
+                        share.state.hat_level = res.hats[0].hatLevel;
+                        dirty = true;
+                    }
+
+                    for arrival in res.arrivals {
+                        let longest_move = arrival.arrivalTime - arrival.departureTime;
+                        if longest_move > share.state.longest_move {
+                            share.state.longest_move = longest_move;
+                        }
+
+                        if arrival.milliSilverMoved > share.state.most_silver_in_motion {
+                            let tweet = format!(
+                                "Sophon 06cfe9ac TX: Whale alert {} moving {} in silver #darkforest",
+                                arrival.player.id,
+                                arrival.milliSilverMoved / 1000,
+                            );
+
+                            share.state.tweets.push_back(tweet);
+
+                            share.state.most_silver_in_motion = arrival.milliSilverMoved;
+                            dirty = true;
+                        }
+                    }
+
+                    // write out to disc
+                    if dirty {
+                        if let Ok(state_json) = serde_json::to_string(&share.state) {
+                            let _ = std::fs::write(STATE_FILE, state_json);
+                        }
+                        dirty = false;
+                    }
                 }
             }
-
-            // write out to disc
-            if dirty {
-                if let Ok(state_json) = serde_json::to_string(&share.state) {
-                    let _ = std::fs::write(STATE_FILE, state_json);
-                }
-                dirty = false;
-            }
-            sleep(COLLECT_DELAY).await;
         }
+        sleep(COLLECT_DELAY).await;
     }
 }
 
@@ -149,45 +159,32 @@ async fn collect_from_node(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<(),
     let mut dirty = false;
 
     loop {
-        let mut share = wrapped_state.lock().await;
+        // scope for mutex release
+        {
+            let mut share = wrapped_state.lock().await;
 
-        if let Ok(world_radius) = df_radius().await {
-            dbg!(world_radius);
+            if let Ok(n_players) = df_players().await {
+                dbg!(n_players);
 
-            if world_radius > share.state.last_radius {
-                let tweet = format!(
-                    "Sophon 8d9b13c5 TX: the universe has expanded to {} adjust accordingly #darkforest",
-                    world_radius
-                );
+                if n_players > share.state.last_user_count {
+                    let tweet = format!(
+                        "Sophon 3a656441 TX: {} civilizations have achieved ftl travel #darkforest",
+                        n_players
+                    );
 
-                share.state.tweets.push_back(tweet);
+                    share.state.tweets.push_back(tweet);
 
-                share.state.last_radius = world_radius;
-                dirty = true;
+                    share.state.last_user_count = n_players;
+                    dirty = true;
+                }
             }
-        }
 
-        if let Ok(n_players) = df_players().await {
-            dbg!(n_players);
-
-            if n_players > share.state.last_user_count {
-                let tweet = format!(
-                    "Sophon 3a656441 TX: {} civilizations have achieved ftl travel #darkforest",
-                    n_players
-                );
-
-                share.state.tweets.push_back(tweet);
-
-                share.state.last_user_count = n_players;
-                dirty = true;
+            if dirty {
+                if let Ok(state_json) = serde_json::to_string(&share.state) {
+                    let _ = std::fs::write(STATE_FILE, state_json);
+                }
+                dirty = false;
             }
-        }
-
-        if dirty {
-            if let Ok(state_json) = serde_json::to_string(&share.state) {
-                let _ = std::fs::write(STATE_FILE, state_json);
-            }
-            dirty = false;
         }
 
         sleep(COLLECT_DELAY).await;
@@ -196,14 +193,31 @@ async fn collect_from_node(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<(),
 
 async fn tweet_counts() -> Result<(), SophonError> {
     loop {
-        sleep(COUNTS_DELAY).await;
-
         if let Ok(counts) = df_counts().await {
             dbg!(counts.clone());
 
             let tweet = format!(
                 "Sophon 02369284 TX: Universe planet totals: lvl0:{}, lvl1:{}, lvl2:{}, lvl3:{}, lvl4:{}, lvl5:{}, lvl6:{}, lvl7:{} #darkforest",
                 counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7]
+            );
+
+            let _ = send(tweet).await;
+        }
+
+        sleep(COUNTS_DELAY).await;
+    }
+}
+
+async fn tweet_radius() -> Result<(), SophonError> {
+    loop {
+        sleep(RADIUS_DELAY).await;
+
+        if let Ok(world_radius) = df_radius().await {
+            dbg!(world_radius);
+
+            let tweet = format!(
+                "Sophon 8d9b13c5 TX: the universe has expanded to {} #darkforest",
+                world_radius
             );
 
             let _ = send(tweet).await;

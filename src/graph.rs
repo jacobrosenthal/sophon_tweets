@@ -34,7 +34,10 @@ pub async fn query_graph(hat_level: u32) -> Result<SophonQueryData, GraphError> 
         .await
         .map_err(GraphError::from)?;
 
-    serde_json::from_str::<SophonQueryData>(response.as_str()).map_err(GraphError::from)
+    let sophon_result =
+        serde_json::from_str::<GraphData>(response.as_str()).map_err(GraphError::from)?;
+
+    Ok(sophon_result.data)
 }
 
 static QUERY: &str = r#"
@@ -63,6 +66,7 @@ query sophon($hat_level: Int!) {
           id
           initTimestamp
         }
+        timestamp
     }
     df_meta: meta(id: 0) {
         lastProcessed
