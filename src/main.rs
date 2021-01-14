@@ -78,7 +78,7 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
         {
             let mut share = wrapped_state.lock().await;
 
-            if let Ok(res) = query_graph(share.state.hat_level).await {
+            if let Ok(res) = query_graph(share.state.hat_level, share.state.planet_level).await {
                 dbg!(res.df_meta.clone());
                 if !res.graph_meta.hasIndexingErrors {
                     if let Some(arrival) = res.arrivals.last() {
@@ -111,13 +111,25 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
 
                     if !res.hats.is_empty() {
                         let tweet = format!(
-                            "Sophon c2463284 TX: {} has discovered lvl {} hat technology #darkforest",
-                            res.hats[0].player.id, res.hats[0].hatLevel
+                            "Sophon c2463284 TX: {} has discovered lvl {} hat technology at {} #darkforest",
+                            res.hats[0].player.id, res.hats[0].hatLevel, res.hats[0].planet.id
                         );
 
                         share.state.tweets.push_back(tweet);
 
                         share.state.hat_level = res.hats[0].hatLevel;
+                        dirty = true;
+                    }
+
+                    if !res.artifacts.is_empty() {
+                        let tweet = format!(
+                            "Sophon a74b242f TX: {} has discovered {} artifact technology at {} #darkforest",
+                            res.artifacts[0].discoverer.id, res.artifacts[0].rarity, res.artifacts[0].planetDiscoveredOn.id
+                        );
+
+                        share.state.tweets.push_back(tweet);
+
+                        share.state.planet_level = share.state.planet_level+2;
                         dirty = true;
                     }
 
@@ -241,10 +253,10 @@ pub struct SophonState {
     most_silver_in_motion: u32,
     /// how many users in system
     last_user_count: u32,
-    /// last reported world radius
-    last_radius: u64,
     /// biggest hat
     hat_level: u32,
+    /// artifact planet level (rarity)
+    planet_level:u32,
     /// scheduled tweets
     tweets: VecDeque<String>,
 }

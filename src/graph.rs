@@ -6,7 +6,7 @@ use tokio_compat_02::FutureExt;
 
 static URL: &str = "https://api.thegraph.com/subgraphs/name/jacobrosenthal/dark-forest-v05";
 
-pub async fn query_graph(hat_level: u32) -> Result<SophonQueryData, GraphError> {
+pub async fn query_graph(hat_level: u32, planet_level: u32) -> Result<SophonQueryData, GraphError> {
     let mut headers = header::HeaderMap::new();
     headers.insert(
         "Content-Type",
@@ -16,7 +16,8 @@ pub async fn query_graph(hat_level: u32) -> Result<SophonQueryData, GraphError> 
     let body = json!({
         "query": QUERY,
         "variables": {
-            "hat_level": hat_level
+            "hat_level": hat_level,
+            "planet_level": planet_level
         }
     });
 
@@ -41,7 +42,7 @@ pub async fn query_graph(hat_level: u32) -> Result<SophonQueryData, GraphError> 
 }
 
 static QUERY: &str = r#"
-query sophon($hat_level: Int!) {
+query sophon($hat_level: Int!, $planet_level: Int!) {
     arrivals(where: {processedAt: null}, orderBy: arrivalTime, orderDirection: asc) {
         id
         arrivalId
@@ -68,6 +69,18 @@ query sophon($hat_level: Int!) {
         }
         timestamp
     }
+    artifacts( first: 1, where: {planetLevel_gt: $planet_level}, orderBy:artifactId, orderDirection:asc) {
+        id
+        rarity
+    	planetLevel
+        discoverer {
+          id
+          initTimestamp
+        }
+        planetDiscoveredOn{
+          id
+        }
+    }
     df_meta: meta(id: 0) {
         lastProcessed
     }
@@ -81,6 +94,16 @@ query sophon($hat_level: Int!) {
     }
 }
 "#;
+
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Artifact {
+    pub id: String,
+    pub planetLevel: u32,
+    pub rarity: String,
+    pub discoverer: Player,
+    pub planetDiscoveredOn: Planet
+}
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -183,6 +206,7 @@ pub struct SophonQueryData {
     pub graph_meta: GraphMeta,
     pub df_meta: DarkForestMeta,
     pub hats: Vec<Hat>,
+    pub artifacts: Vec<Artifact>
 }
 
 #[derive(Debug)]
