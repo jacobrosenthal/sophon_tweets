@@ -56,12 +56,17 @@ query sophon($hat_level: Int!, $planet_level: Int!) {
           id
           initTimestamp
         }
+        fromPlanet{
+          id
+          speed
+        }
     }
     hats(first: 1, where: {hatLevel_gt: $hat_level}, orderBy:hatLevel, orderDirection:asc) {
         id
         hatLevel
         planet {
           id
+          speed
         }
         player {
           id
@@ -79,6 +84,7 @@ query sophon($hat_level: Int!, $planet_level: Int!) {
         }
         planetDiscoveredOn{
           id
+          speed
         }
     }
     df_meta: meta(id: 0) {
@@ -102,7 +108,7 @@ pub struct Artifact {
     pub planetLevel: u32,
     pub rarity: String,
     pub discoverer: Player,
-    pub planetDiscoveredOn: Planet
+    pub planetDiscoveredOn: Planet,
 }
 
 #[allow(non_snake_case)]
@@ -116,6 +122,7 @@ pub struct Arrival {
     pub milliEnergyArriving: u32,
     pub processedAt: Option<u32>,
     pub milliSilverMoved: u32,
+    pub fromPlanet: Planet,
     pub player: Player,
 }
 
@@ -148,7 +155,7 @@ pub struct Planet {
     // pub lastUpdated: u32,
     // pub perlin: u32,
     // pub range: u32,
-    // pub speed: u32,
+    pub speed: u32,
     // pub defense: u32,
     // pub milliEnergyLazy: u32,
     // pub milliEnergyCap: u32,
@@ -206,7 +213,7 @@ pub struct SophonQueryData {
     pub graph_meta: GraphMeta,
     pub df_meta: DarkForestMeta,
     pub hats: Vec<Hat>,
-    pub artifacts: Vec<Artifact>
+    pub artifacts: Vec<Artifact>,
 }
 
 #[derive(Debug)]

@@ -82,7 +82,6 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
                 dbg!(res.df_meta.clone());
                 if !res.graph_meta.hasIndexingErrors {
                     if let Some(arrival) = res.arrivals.last() {
-
                         let significant = (arrival.arrivalId / 100000) * 100000;
                         if significant > share.state.significant_arrival {
                             let tweet = format!(
@@ -99,7 +98,7 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
 
                     if res.arrivals.len() > share.state.most_arrivals_in_motion {
                         let tweet = format!(
-                        "Sophon ec1b89f9 TX: Unusually high activity {} movements detected #darkforest",
+                        "Sophon ec1b89f9 TX: Unusually high activity: {} movements detected #darkforest",
                         res.arrivals.len()
                     );
 
@@ -123,32 +122,56 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
 
                     if !res.artifacts.is_empty() {
                         let tweet = format!(
-                            "Sophon a74b242f TX: {} has discovered {} artifact technology at {} #darkforest",
-                            res.artifacts[0].discoverer.id, res.artifacts[0].rarity, res.artifacts[0].planetDiscoveredOn.id
+                            "Sophon a74b242f TX: {} artifact technology discovered at {} via {} #darkforest",
+                            res.artifacts[0].rarity, res.artifacts[0].planetDiscoveredOn.id, res.artifacts[0].discoverer.id,
                         );
 
                         share.state.tweets.push_back(tweet);
 
-                        share.state.planet_level = share.state.planet_level+2;
+                        share.state.planet_level = share.state.planet_level + 2;
                         dirty = true;
                     }
 
                     for arrival in res.arrivals {
-                        let longest_move = arrival.arrivalTime - arrival.departureTime;
+                        // could just be a planet with terrible speed...
+
+                        let mut length_tweets: Vec<String> = vec![];
+                        let longest_move = (arrival.arrivalTime - arrival.departureTime)
+                            * (arrival.fromPlanet.speed / 100);
                         if longest_move > share.state.longest_move {
+                            let tweet = format!(
+                                "Sophon eb4bc797 TX: Record interstellar voyage arriving in {} seconds via {} #darkforest",
+                                arrival.arrivalTime - arrival.departureTime,
+                                arrival.player.id,
+                            );
+                            length_tweets.push(tweet);
+
                             share.state.longest_move = longest_move;
+                            dirty = true;
                         }
 
+                        // only tweet the biggest move
+                        if let Some(tweet) = length_tweets.last() {
+                            share.state.tweets.push_back(tweet.to_string());
+                            dirty = true;
+                        }
+
+                        let mut whale_tweets: Vec<String> = vec![];
                         if arrival.milliSilverMoved > share.state.most_silver_in_motion {
                             let tweet = format!(
-                                "Sophon 06cfe9ac TX: Whale alert {} moving {} in silver #darkforest",
-                                arrival.player.id,
+                                "Sophon 06cfe9ac TX: Whale alert {} silver in motion via {} #darkforest",
                                 arrival.milliSilverMoved / 1000,
+                                arrival.player.id,
                             );
-
-                            share.state.tweets.push_back(tweet);
+                            whale_tweets.push(tweet);
 
                             share.state.most_silver_in_motion = arrival.milliSilverMoved;
+                            dirty = true;
+                        }
+
+                        // only tweet the biggest whale
+                        if let Some(tweet) = whale_tweets.last() {
+                            share.state.tweets.push_back(tweet.to_string());
                             dirty = true;
                         }
                     }
@@ -256,7 +279,7 @@ pub struct SophonState {
     /// biggest hat
     hat_level: u32,
     /// artifact planet level (rarity)
-    planet_level:u32,
+    planet_level: u32,
     /// scheduled tweets
     tweets: VecDeque<String>,
 }
