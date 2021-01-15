@@ -20,7 +20,6 @@ use twitter::*;
 const STAGGER_DELAY: Duration = Duration::from_secs(60 * 60);
 const COLLECT_DELAY: Duration = Duration::from_secs(60 * 30);
 
-const RADIUS_DELAY: Duration = Duration::from_secs(60 * 60 * 12);
 const COUNTS_DELAY: Duration = Duration::from_secs(60 * 60 * 12);
 
 const STATE_FILE: &str = "sophon_state.json";
@@ -39,7 +38,6 @@ async fn main() {
         collect_from_node(wrapped_state.clone()),  //COLLECT_DELAY
         tweets(wrapped_state.clone()),             //STAGGER_DELAY
         tweet_counts(),                            //COUNTS_DELAY
-        tweet_radius()                             //RADIUS_DELAY
     )
     .await
     .unwrap();
@@ -81,6 +79,7 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
             if let Ok(res) = query_graph(share.state.hat_level, share.state.planet_level).await {
                 dbg!(res.df_meta.clone());
                 if !res.graph_meta.hasIndexingErrors {
+
                     if let Some(arrival) = res.arrivals.last() {
                         let significant = (arrival.arrivalId / 100000) * 100000;
                         if significant > share.state.significant_arrival {
@@ -133,11 +132,12 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
                     }
 
                     for arrival in res.arrivals {
-                        // could just be a planet with terrible speed...
 
                         let mut length_tweets: Vec<String> = vec![];
-                        let longest_move = (arrival.arrivalTime - arrival.departureTime)
-                            * (arrival.fromPlanet.speed / 100);
+
+                        let longest_move = ((arrival.arrivalTime - arrival.departureTime) as f64
+                            / (arrival.fromPlanet.speed as f64 / 100.0)) as u32;
+
                         if longest_move > share.state.longest_move {
                             let tweet = format!(
                                 "Sophon eb4bc797 TX: Record interstellar voyage arriving in {} seconds via {} #darkforest",
@@ -157,7 +157,7 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
                         }
 
                         let mut whale_tweets: Vec<String> = vec![];
-                        if arrival.milliSilverMoved > share.state.most_silver_in_motion {
+                        if arrival.milliSilverMoved > share.state.most_millisilver_in_motion {
                             let tweet = format!(
                                 "Sophon 06cfe9ac TX: Whale alert {} silver in motion via {} #darkforest",
                                 arrival.milliSilverMoved / 1000,
@@ -165,7 +165,7 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
                             );
                             whale_tweets.push(tweet);
 
-                            share.state.most_silver_in_motion = arrival.milliSilverMoved;
+                            share.state.most_millisilver_in_motion = arrival.milliSilverMoved;
                             dirty = true;
                         }
 
@@ -198,18 +198,38 @@ async fn collect_from_node(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<(),
         {
             let mut share = wrapped_state.lock().await;
 
-            if let Ok(n_players) = df_players().await {
-                dbg!(n_players);
+            if let Ok(significant_radius) = df_radius().await {
+                dbg!(significant_radius);
 
-                if n_players > share.state.last_user_count {
+                let significant = (significant_radius / 1000) * 1000;
+
+                if significant > share.state.significant_radius {
                     let tweet = format!(
-                        "Sophon 3a656441 TX: {} civilizations have achieved ftl travel #darkforest",
-                        n_players
+                        "Sophon 8d9b13c5 TX: the universe has expanded to {} #darkforest",
+                        significant_radius
                     );
 
                     share.state.tweets.push_back(tweet);
 
-                    share.state.last_user_count = n_players;
+                    share.state.significant_radius = significant;
+                    dirty = true;
+                }
+            }
+
+            if let Ok(significant_user) = df_players().await {
+                dbg!(significant_user);
+
+                let significant = (significant_user / 10) * 10;
+
+                if significant > share.state.significant_user {
+                    let tweet = format!(
+                        "Sophon 3a656441 TX: {} civilizations have achieved ftl travel #darkforest",
+                        significant_user
+                    );
+
+                    share.state.tweets.push_back(tweet);
+
+                    share.state.significant_user = significant;
                     dirty = true;
                 }
             }
@@ -228,6 +248,9 @@ async fn collect_from_node(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<(),
 
 async fn tweet_counts() -> Result<(), SophonError> {
     loop {
+
+        sleep(COUNTS_DELAY).await;
+
         if let Ok(counts) = df_counts().await {
             dbg!(counts.clone());
 
@@ -239,24 +262,6 @@ async fn tweet_counts() -> Result<(), SophonError> {
             let _ = send(tweet).await;
         }
 
-        sleep(COUNTS_DELAY).await;
-    }
-}
-
-async fn tweet_radius() -> Result<(), SophonError> {
-    loop {
-        sleep(RADIUS_DELAY).await;
-
-        if let Ok(world_radius) = df_radius().await {
-            dbg!(world_radius);
-
-            let tweet = format!(
-                "Sophon 8d9b13c5 TX: the universe has expanded to {} #darkforest",
-                world_radius
-            );
-
-            let _ = send(tweet).await;
-        }
     }
 }
 
@@ -270,16 +275,18 @@ pub struct SophonState {
     most_arrivals_in_motion: usize,
     /// n hundred thousandth arrival
     significant_arrival: u32,
-    /// arrivaltime-departuretime in seconds
+    /// longest move in distance
     longest_move: u32,
     /// Whale alert in millisilver
-    most_silver_in_motion: u32,
-    /// how many users in system
-    last_user_count: u32,
+    most_millisilver_in_motion: u32,
+    /// last significant user count
+    significant_user: u32,
     /// biggest hat
     hat_level: u32,
     /// artifact planet level (rarity)
     planet_level: u32,
+    /// last significant radius
+    significant_radius: u64,
     /// scheduled tweets
     tweets: VecDeque<String>,
 }
