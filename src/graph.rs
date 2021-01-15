@@ -74,10 +74,11 @@ query sophon($hat_level: Int!, $planet_level: Int!) {
         }
         timestamp
     }
-    artifacts( first: 1, where: {planetLevel_gt: $planet_level}, orderBy:artifactId, orderDirection:asc) {
+    artifacts( first: 1, where: {planetLevel_gt: $planet_level}, orderBy:mintedAtTimestamp, orderDirection:asc) {
         id
         rarity
-    	planetLevel
+        planetLevel
+        mintedAtTimestamp
         discoverer {
           id
           initTimestamp
@@ -109,6 +110,7 @@ pub struct Artifact {
     pub rarity: String,
     pub discoverer: Player,
     pub planetDiscoveredOn: Planet,
+    pub mintedAtTimestamp: u32,
 }
 
 #[allow(non_snake_case)]
