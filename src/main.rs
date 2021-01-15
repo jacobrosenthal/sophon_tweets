@@ -79,7 +79,6 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
             if let Ok(res) = query_graph(share.state.hat_level, share.state.planet_level).await {
                 dbg!(res.df_meta.clone());
                 if !res.graph_meta.hasIndexingErrors {
-
                     if let Some(arrival) = res.arrivals.last() {
                         let significant = (arrival.arrivalId / 100000) * 100000;
                         if significant > share.state.significant_arrival {
@@ -127,16 +126,16 @@ async fn collect_from_graph(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<()
 
                         share.state.tweets.push_back(tweet);
 
-                        share.state.planet_level = share.state.planet_level + 2;
+                        share.state.planet_level += 2;
                         dirty = true;
                     }
 
                     for arrival in res.arrivals {
-
                         let mut length_tweets: Vec<String> = vec![];
 
                         let longest_move = ((arrival.arrivalTime - arrival.departureTime) as f64
-                            / (arrival.fromPlanet.speed as f64 / 100.0)) as u32;
+                            / (arrival.fromPlanet.speed as f64 / 100.0))
+                            as u32;
 
                         if longest_move > share.state.longest_move {
                             let tweet = format!(
@@ -248,7 +247,6 @@ async fn collect_from_node(wrapped_state: Arc<Mutex<SophonShare>>) -> Result<(),
 
 async fn tweet_counts() -> Result<(), SophonError> {
     loop {
-
         sleep(COUNTS_DELAY).await;
 
         if let Ok(counts) = df_counts().await {
@@ -261,7 +259,6 @@ async fn tweet_counts() -> Result<(), SophonError> {
 
             let _ = send(tweet).await;
         }
-
     }
 }
 
